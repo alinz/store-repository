@@ -12,5 +12,8 @@
   "bugs": {
     "url": "https://github.com/alinz/store-repository/issues"
   },
-  "homepage": "https://github.com/alinz/store-repository"
+  "homepage": "https://github.com/alinz/store-repository",
+  "dependencies": {
+    "hoist-non-react-statics": "^2.5.0"
+  }
 }

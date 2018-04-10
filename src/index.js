@@ -1,43 +1,53 @@
 // @flow
 
 import * as React from 'react'
+import hoistStatics from 'hoist-non-react-statics'
 
-const init = () => {
-  const stores: Map<Class<*>, { instance: *, name: string }> = new Map()
+const getStoresMap = (repository: Repository, ...requestedStores: Array<Class<*>>): { [string]: * } =>
+  requestedStores.reduce((base: { [string]: any }, StoreClass: Class<*>) => {
+    const { instance, name } = repository.get(StoreClass)
 
-  const getStoresMap = (...requestedStores: Array<Class<*>>): { [string]: * } =>
-    requestedStores.reduce((base: { [string]: any }, StoreClass: Class<*>) => {
-      const { instance, name } = repository.get(StoreClass)
+    base[name] = instance
 
-      base[name] = instance
+    return base
+  }, {})
 
-      return base
-    }, {})
+export class Repository {
+  stores: Map<Class<*>, { instance: *, name: string }> = new Map()
 
-  const repository = {
-    set: function<T>(key: Class<T>, instance: T, name: string): void {
-      if (stores.has(key)) {
-        throw new Error(`store already registered`)
-      }
-      stores.set(key, { instance, name })
-    },
-    get: function<T>(key: Class<T>): { instance: T, name: string } {
-      const value = stores.get(key)
-      if (!value) {
-        throw new Error('store not found')
-      }
-      return { instance: ((value.instance: any): T), name: value.name }
+  set<T>(key: Class<T>, instance: T, name: string): void {
+    if (this.stores.has(key)) {
+      throw new Error(`store already registered`)
     }
+    this.stores.set(key, { instance, name })
   }
 
-  const inject = (...requestedStores: Array<Class<*>>) => (Component: React.ComponentType<any>) => (props: {
-    [string]: *
-  }) => <Component {...props} {...getStoresMap(...requestedStores)} />
+  get<T>(key: Class<T>): { instance: T, name: string } {
+    const value = this.stores.get(key)
+    if (!value) {
+      throw new Error('store not found')
+    }
+    return { instance: ((value.instance: any): T), name: value.name }
+  }
 
-  return {
-    repository,
-    inject
+  getInstance<T>(key: Class<T>): T {
+    const { instance } = this.get(key)
+    return instance
   }
 }
 
-export default init
+export const repository = new Repository()
+
+export const inject = (...requestedStores: Array<Class<*>>) => (Component: React.ComponentType<any>) => {
+  const displayName = `inject-${Component.displayName || Component.name}`
+  class InjectComponent extends React.Component<any> {
+    static displayName = displayName
+
+    render() {
+      return <Component {...this.props} {...getStoresMap(repository, ...requestedStores)} />
+    }
+  }
+
+  hoistStatics(InjectComponent, Component)
+  return InjectComponent
+}
